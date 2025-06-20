@@ -19,31 +19,35 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Return command flow as a state value. This method has to be annotated as composable
- * because the method should be re-composed after each value change.
+ * Collects command flow as state, triggering recomposition on each new value.
  */
 @Composable
-fun <STATE : ViewState, COMMAND : ViewCommand, VM : BaseViewModel<STATE, COMMAND>>
-        VM.collectCommandAsState(initialState: COMMAND? = null) =
-    commandFlow.collectAsState(initial = initialState).value
+fun <STATE : ViewState, COMMAND : ViewCommand, VM : BaseViewModel<STATE, COMMAND>> VM.collectCommandAsState(
+    initial: COMMAND? = null
+): COMMAND? {
+    return commandFlow.collectAsState(initial = initial).value
+}
 
 /**
- * Return state flow as a state value. This method has to be annotated as composable
- * because the method should be re-composed after each value change.
+ * Collects state flow with lifecycle awareness, returning current state as a Compose state.
  */
 @SuppressLint("FlowOperatorInvokedInComposition")
 @Composable
-fun <STATE : ViewState, COMMAND : ViewCommand, VM : BaseViewModel<STATE, COMMAND>>
-        VM.collectStateAsState(initialState: STATE = this.initialState) =
-    stateFlow.flowWithLifecycle(LocalLifecycleOwner.current.lifecycle, Lifecycle.State.STARTED).collectAsState(initial = initialState).value
+fun <STATE : ViewState, COMMAND : ViewCommand, VM : BaseViewModel<STATE, COMMAND>> VM.collectStateAsState(
+    initial: STATE = this.initialState
+): STATE {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    return stateFlow
+        .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+        .collectAsState(initial = initial)
+        .value
+}
 
 /**
- * Allows to send an UI event via VM default coroutine scope.
+ * Dispatches UI event to the ViewModel's event channel using Default dispatcher.
  */
-fun <VM : BaseViewModel<*, *>, EVENT : ViewEvent> VM.sendEvent(
-    event: EVENT
-) {
-    this.viewModelScope.launch(Dispatchers.Default) {
-        this@sendEvent.eventChannel.send(event)
+fun <VM : BaseViewModel<*, *>, EVENT : ViewEvent> VM.sendEvent(event: EVENT) {
+    viewModelScope.launch(Dispatchers.Default) {
+        eventChannel.send(event)
     }
 }

@@ -18,68 +18,64 @@ import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-abstract class BaseViewModel<STATE : ViewState, COMMAND : ViewCommand>(val initialState: STATE) :
-    ViewModel() {
-    private val _stateFlow = MutableStateFlow(initialState)
+abstract class BaseViewModel<STATE : ViewState, COMMAND : ViewCommand>(
+    val initialState: STATE
+) : ViewModel() {
 
-    /**
-     * Contains current state of view
-     */
+    // --- Internal state ---
+    private val _stateFlow = MutableStateFlow(initialState)
     val stateFlow: Flow<STATE> = _stateFlow.asStateFlow()
 
     private val _commandFlow = MutableSharedFlow<COMMAND?>()
-
-    /**
-     * Contains a one-time event for view (command)
-     */
     val commandFlow: Flow<COMMAND?> = _commandFlow.asSharedFlow()
 
-    /**
-     * A channel to handle events from view
-     */
-    val eventChannel = Channel<ViewEvent>(Channel.UNLIMITED)
-
+    val eventChannel: Channel<ViewEvent> = Channel(Channel.UNLIMITED)
 
     init {
-        handleEvent()
+        observeEvents()
     }
 
+    // --- Public/state mutation API ---
+
     /**
-     * Updates view state with a new value.
+     * Updates the current view state using a reducer lambda.
      */
-    protected fun updateState(body: STATE.() -> STATE) {
+    protected fun updateState(reducer: STATE.() -> STATE) {
         synchronized(_stateFlow) {
-            _stateFlow.update { body(_stateFlow.value) }
+            _stateFlow.update { it.reducer() }
         }
     }
 
     /**
-     * Gets the current view state.
+     * Returns the current view state.
      */
     protected fun currentState(): STATE {
-        synchronized(_stateFlow) {
-            return _stateFlow.value
+        return synchronized(_stateFlow) {
+            _stateFlow.value
         }
     }
 
     /**
-     * Sends a command to the channel.
+     * Emits a one-time command to be observed by the view layer.
      */
     protected fun sendCommand(command: COMMAND) {
-        viewModelScope.launch { _commandFlow.emit(command) }
+        viewModelScope.launch {
+            _commandFlow.emit(command)
+        }
     }
 
     /**
-     * Handle a ViewModel specific event.
+     * Override to handle a UI event dispatched from the view layer.
      */
-    protected open fun onEvent(event: ViewEvent) {
-    }
+    protected open fun onEvent(event: ViewEvent) = Unit
 
-    private fun handleEvent() {
+    // --- Internal flow handling ---
+
+    private fun observeEvents() {
         viewModelScope.launch(Dispatchers.IO) {
-            eventChannel.consumeAsFlow().collect { localEvent ->
-                onEvent(localEvent)
-            }
+            eventChannel
+                .consumeAsFlow()
+                .collect { event -> onEvent(event) }
         }
     }
 }
