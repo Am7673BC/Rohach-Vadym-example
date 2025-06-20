@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">O2 test by Rohach Vadym</string>
+
+    <string name="password_rule_min_length">At least 8 characters</string>
+    <string name="password_rule_uppercase">At least one uppercase letter</string>
+    <string name="password_rule_number">At least one number</string>
+    <string name="password_rule_special_char">At least one special character (? = # / %)</string>
+</resources>
